@@ -1,0 +1,60 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: ledger
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi                 # asks cluster for 1Gi locker
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: 
+  name: postgres
+  namespace: ledger
+spec:
+  replicas: 1
+  selector: 
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec: 
+      containers:
+        - name: postgres
+          image: postgres:16
+          ports: 
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value:  ledger
+            - name: POSTGRES_PASSWORD
+              value:  ledger
+            - name: POSTGRES_DB
+              value:  ledger
+            - name: PGDATA
+              value:  /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+---
+apiVersion: v1
+kind: Service
+metadata: 
+  name: postgres
+  namespace:  ledger
+spec:
+  selector: 
+    app: postgres                       # send traffic to those pods
+  ports:
+    - port: 5432                        # caller dials: postgres:5432
+      targetPort: 5432                  # container port 

@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-api
+  namespace: ledger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: order-api
+  template:
+    metadata:
+      labels:
+        app: order-api
+    spec:
+      containers:
+        - name: order-api
+          image: ledger-order-api:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DATABASE_URL
+              value: postgres://ledger:ledger@postgres:5432/ledger?sslmode=disable
+            - name: REDIS_ADDR
+              value: redis:6379
+            - name: HTTP_ADDR
+              value: ":8080"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-api
+  namespace: ledger
+spec:
+  selector:
+    app: order-api
+  ports:
+    - port: 8080
+      targetPort: 8080

@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: settlement-worker
+  namespace: ledger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: settlement-worker
+  template:
+    metadata:
+      labels:
+        app: settlement-worker
+    spec:
+      containers:
+        - name: settlement-worker
+          image: ledger-settlement-worker:dev
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DATABASE_URL
+              value: postgres://ledger:ledger@postgres:5432/ledger?sslmode=disable
+            - name: REDIS_ADDR
+              value: redis:6379
