@@ -24,19 +24,19 @@ type Client struct {
 // Connect to redis and Ping. Log errs if ping fails
 func Connect(addr string) (*Client, error) {
 	ctx := context.Background()
-	rdb := redis.NewClient(&redis.Options{
+	redisClient := redis.NewClient(&redis.Options{
 		Addr: addr,
 	})
 
 	// go-redis Ping returns a StatusCmd object. we only use Err()
-	if err := rdb.Ping(ctx).Err(); err != nil {
-		_ = rdb.Close()
+	if err := redisClient.Ping(ctx).Err(); err != nil {
+		_ = redisClient.Close()
 		return nil, fmt.Errorf("Redis ping: %w", err)
 	}
 	
     fmt.Println("Connected to Redis Successfull")
 
-	return &Client{RDB: rdb}, nil
+	return &Client{RDB: redisClient}, nil
 }
 
 func (c * Client) Close() error {

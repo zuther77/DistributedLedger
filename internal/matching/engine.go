@@ -120,6 +120,7 @@ func (e * Engine) handleSell(ctx context.Context, sell orders.Order) error {
 // if theres a match remove buy and sell order from redis zset and push it to order_stream
 func (e *Engine) emitMatch(ctx context.Context, buy orders.Order, sell orders.Order, execPrice string) error {
 
+	fmt.Printf("Order Matched. Pushing order to stream")
 	if err := e.Book.Remove(ctx, buy.Ticker, buy.ID); err != nil{
 		return err
 	}
@@ -134,7 +135,7 @@ func (e *Engine) emitMatch(ctx context.Context, buy orders.Order, sell orders.Or
 			"buy_order_id": 	buy.ID,
 			"sell_order_id": 	sell.ID,
 			"ticker":			buy.Ticker, 
-			"Price":			execPrice,
+			"price":			execPrice,
 			"qty":				buy.Quantity, 
 		},
 	}).Result()

@@ -19,16 +19,16 @@ type Handlers struct {
 
 // create order. Parse incoming json, insert in postgres, add to redis stream
 // handles POST /api/v1/orders
-func (h *Handlers) CreateOrder(c *gin.Context) {
+func (h *Handlers) CreateOrder(requestContext *gin.Context) {
 	var req CreateOrderRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest , gin.H{"Error":"Invalid JSON body"} )
+	if err := requestContext.ShouldBindJSON(&req); err != nil {
+		requestContext.JSON(http.StatusBadRequest , gin.H{"Error":"Invalid JSON body"} )
 		return 
 	}
 
 	// validate request before adding to db and stream
 	if err := validateOrderRequest(req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"Error": err.Error()})
+		requestContext.JSON(http.StatusBadRequest, gin.H{"Error": err.Error()})
 		return
 	}
 
@@ -43,18 +43,18 @@ func (h *Handlers) CreateOrder(c *gin.Context) {
 	}
 
 	// add order to POSTGRES first 
-	if err := h.Repo.InsertPending(c.Request.Context(), order); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save order in postgres: "})
+	if err := h.Repo.InsertPending(requestContext.Request.Context(), order); err != nil {
+		requestContext.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save order in postgres: "})
 		return
 	}
 
 	// add order to redis stream
-	if err := h.Redis.EnqueueOrder(c.Request.Context(), order.ID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error":"order failed to pused to redis stream. Order saved to postgres"})
+	if err := h.Redis.EnqueueOrder(requestContext.Request.Context(), order.ID); err != nil {
+		requestContext.JSON(http.StatusInternalServerError, gin.H{"error":"order failed to pused to redis stream. Order saved to postgres"})
 		return
 	}
 
-	c.JSON(http.StatusCreated , gin.H{
+	requestContext.JSON(http.StatusCreated , gin.H{
 		"id": 		order.ID,
 		"status": 	order.Status,
 	})

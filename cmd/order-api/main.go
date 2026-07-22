@@ -14,39 +14,39 @@ import (
 
 func main() {
     // loading config
-    cfg := config.Load()
+    config := config.Load()
 
     // Timeout so a hung DB does not freeze startup forever.
     ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
     defer cancel()
 
     // connect to postgres
-    pool , err := db.Connect(ctx, cfg.DatabaseUrl)
+    pool , err := db.Connect(ctx, config.DatabaseUrl)
     if err != nil {
         log.Fatalf("postgres: %v", err)
     }
     defer pool.Close()
 
     // Connect to Redis
-    rdb , err := redisx.Connect(cfg.RedisAddr)
+    rdb , err := redisx.Connect(config.RedisAddr)
     if err != nil {
         log.Fatalf("Redis: %v", err)
     }
     defer rdb.Close()
 
     // pass handlers 
-    h := &orders.Handlers{
+    handlers := &orders.Handlers{
         Repo: &orders.Repository{DB: pool},
         Redis: rdb,
     }
-    r := gin.Default()
+    ginEngine := gin.Default()
 
-    v1 := r.Group("/api/v1")
-    v1.POST("/orders", h.CreateOrder)
-    v1.GET("/orders/:id", h.GetOrder)
+    v1 := ginEngine.Group("/api/v1")
+    v1.POST("/orders", handlers.CreateOrder)
+    v1.GET("/orders/:id", handlers.GetOrder)
         
-    log.Printf("order-api listening on %2=s", cfg.HTTPAddr)
-    if err := r.Run(cfg.HTTPAddr); err != nil {
+    log.Printf("order-api listening on %2=s", config.HTTPAddr)
+    if err := ginEngine.Run(config.HTTPAddr); err != nil {
         log.Fatalf("http server: %v", err )
     }
 
