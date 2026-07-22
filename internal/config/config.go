@@ -11,8 +11,8 @@ type Config struct {
 
 func Load() Config {
 	return Config{
-		DatabaseUrl: getenv("DATABASE_ULR" , "postgres://ledger:ledger@localhost:5432/ledger?sslmode=disable"),
-		RedisAddr: getenv("REDIS_ADDR", "localhost:6379"),
+		DatabaseUrl: getenv("DATABASE_ULR" , "postgres://ledger:ledger@postgres:5432/ledger?sslmode=disable"),
+		RedisAddr: getenv("REDIS_ADDR", "redis:6379"),
 		HTTPAddr: getenv("HTTP_ADDR", ":8080"),
 	}
 }

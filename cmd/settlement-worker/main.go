@@ -81,8 +81,8 @@ func handleSettlementMsg(ctx context.Context, settlementWorker *settlement.Worke
 }
 
 func hostnameOr(fallback string) string {
-	if h, err := os.Hostname(); err != nil && h != "" {
-		return  h
+	if hostName, err := os.Hostname(); err == nil && hostName != "" {
+		return hostName
 	}
 	return fallback
 }

@@ -37,3 +37,9 @@ CREATE INDEX IF NOT EXISTS idx_trades_buy_order_id ON trades(buy_order_id);
 
 -- find trades by sell order faster
 CREATE INDEX IF NOT EXISTS idx_trades_sell_order_id ON trades(sell_order_id);
+
+-- Demo users (smoke.py / curl labs). Only runs on first Postgres boot (empty volume).
+INSERT INTO users (id, balance) VALUES
+  ('11111111-1111-1111-1111-111111111111', 10000.00), -- buyer
+  ('22222222-2222-2222-2222-222222222222', 10000.00)  -- seller
+ON CONFLICT (id) DO NOTHING;

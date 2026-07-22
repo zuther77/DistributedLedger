@@ -1,0 +1,6 @@
+.git
+**/*_test.go
+*.md
+.DS_Store
+deploy/k8s
+deploy/terraform

@@ -1,0 +1,81 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ledger
+      POSTGRES_PASSWORD: ledger
+      POSTGRES_DB: ledger
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Paths are relative to this compose file (deploy/), not your shell cwd.
+      - ../migrations/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ledger -d ledger"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  order-api:
+    build:
+      # Context must be repo root (parent of deploy/) so go.mod / go.sum / cmd/ are visible.
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        SERVICE: order-api
+    environment: 
+      DATABASE_URL: postgres://ledger:ledger@postgres:5432/ledger?sslmode=disable
+      REDIS_ADDR: redis:6379
+      HTTP_ADDR: ":8080"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  matching-engine:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        SERVICE: matching-engine
+    environment:
+      DATABASE_URL: postgres://ledger:ledger@postgres:5432/ledger?sslmode=disable
+      REDIS_ADDR: redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  settlement-worker:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        SERVICE: settlement-worker
+    environment:
+      DATABASE_URL: postgres://ledger:ledger@postgres:5432/ledger?sslmode=disable
+      REDIS_ADDR: redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata: {}
