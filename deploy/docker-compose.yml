@@ -17,7 +17,7 @@ services:
       interval: 3s
       timeout: 3s
       retries: 20
-    
+
   redis:
     image: redis:7
     ports:
@@ -35,7 +35,7 @@ services:
       dockerfile: Dockerfile
       args:
         SERVICE: order-api
-    environment: 
+    environment:
       DATABASE_URL: postgres://ledger:ledger@postgres:5432/ledger?sslmode=disable
       REDIS_ADDR: redis:6379
       HTTP_ADDR: ":8080"
@@ -76,6 +76,24 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - order-api
+      - matching-engine
+      - settlement-worker
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
 
 volumes:
   pgdata: {}

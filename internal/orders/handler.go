@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/zuther77/distributed-ledger/internal/metrics"
 	"github.com/zuther77/distributed-ledger/internal/redisx"
 )
 
@@ -54,6 +55,7 @@ func (h *Handlers) CreateOrder(requestContext *gin.Context) {
 		return
 	}
 
+	metrics.OrderProcessed.Inc()
 	requestContext.JSON(http.StatusCreated , gin.H{
 		"id": 		order.ID,
 		"status": 	order.Status,

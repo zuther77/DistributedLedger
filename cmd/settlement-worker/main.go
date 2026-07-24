@@ -3,16 +3,27 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/zuther77/distributed-ledger/internal/config"
 	"github.com/zuther77/distributed-ledger/internal/db"
+	"github.com/zuther77/distributed-ledger/internal/metrics"
 	"github.com/zuther77/distributed-ledger/internal/redisx"
 	"github.com/zuther77/distributed-ledger/internal/settlement"
 )
 
 func main() {
+	// Metrics HTTP for Prometheus (scrapes :2112/metrics on the Compose network).
+	go func() {
+		metricsMux := http.NewServeMux()
+		metricsMux.Handle("/metrics", promhttp.Handler())
+		log.Println("metrics listening on :2112")
+		_ = http.ListenAndServe(":2112", metricsMux)
+	}()
+
 	config := config.Load()
 	ctx := context.Background()
 
@@ -73,6 +84,7 @@ func handleSettlementMsg(ctx context.Context, settlementWorker *settlement.Worke
 	}
 
 	if err := settlementWorker.Settle(ctx, matchEvent); err != nil {
+		metrics.SettlementErrors.Inc()
 		log.Printf("settle %s: %v (will retry)", matchEvent.TradeID, err)
 		return // do NOT ack
 	}

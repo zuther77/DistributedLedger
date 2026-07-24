@@ -3,12 +3,15 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/zuther77/distributed-ledger/internal/config"
 	"github.com/zuther77/distributed-ledger/internal/db"
 	"github.com/zuther77/distributed-ledger/internal/matching"
+	"github.com/zuther77/distributed-ledger/internal/metrics"
 	"github.com/zuther77/distributed-ledger/internal/orders"
 	"github.com/zuther77/distributed-ledger/internal/reconcile"
 	"github.com/zuther77/distributed-ledger/internal/redisx"
@@ -26,6 +29,14 @@ import (
 */ 
 
 func main() {
+	// go routine for metrics start
+	go func ()  {
+		metrticsMux := http.NewServeMux()
+		metrticsMux.Handle("/metrics", promhttp.Handler())
+		log.Printf("Metrics listening on port:2112")
+		_ = http.ListenAndServe(":2112", metrticsMux)
+	} ()
+
 	config := config.Load()
 	ctx := context.Background()
 
@@ -92,12 +103,13 @@ func processOrderMsg(ctx context.Context, engine *matching.Engine, rdb *redisx.C
 		_ = rdb.Ack(ctx, redisx.StreamOrders, redisx.GroupMatchers, id)
 		return
 	}
-
+	startedAt := time.Now()
 	if err := engine.HandleOrderByID(ctx, orderID); err != nil {
 		// Leave unacked → stays pending → ClaimStale/retry can redo it.
 		log.Printf("Handle %s: %v (will retry)", orderID, err)
 		return
 	}
+	metrics.MatchingLatency.Observe(float64(time.Since(startedAt).Seconds()))
 
 	if err := rdb.Ack(ctx, redisx.StreamOrders, redisx.GroupMatchers, id); err != nil {
 		log.Printf("acknowledged failed ID %s: %v", id, err)

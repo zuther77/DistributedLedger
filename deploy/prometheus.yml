@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: order-api
+    static_configs:
+      - targets: ["order-api:8080"]
+
+  - job_name: matching-engine
+    static_configs:
+      - targets: ["matching-engine:2112"]
+
+  - job_name: settlement-worker
+    static_configs:
+      - targets: ["settlement-worker:2112"]
