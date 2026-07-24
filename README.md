@@ -50,16 +50,6 @@ This is a **learning / portfolio system** — concurrency, distributed state, an
 3. **settlement-worker** reads via consumer group `settlers`, settles balances and marks orders `FILLED` in one transaction, then `XACK`s.
 4. A **reconcile** loop re-injects stuck `PENDING` orders if they fell out of the stream/book path.
 
-### Why these pieces
-
-| Piece | Role |
-|---|---|
-| Postgres | Source of truth for money and order status (ACID) |
-| Redis Streams | Durable queue; unacked messages can be `XCLAIM`ed after a crash |
-| Redis ZSET | Live order book (fast; rebuilt/reconciled on drift) |
-| Consumer groups | At-least-once delivery without Pub/Sub fire-and-forget |
-| Idempotent SQL | `UPDATE … WHERE status = 'PENDING'` so double-settle is safe |
-
 ---
 
 ## Repository layout
@@ -78,9 +68,10 @@ DistributedLedger/
 ├── deploy/
 │   ├── docker-compose.yml      # Full local stack
 │   ├── docker-compose.dev.yml  # Postgres + Redis only
-│   └── k8s/                    # Minikube manifests
+│   └── k8s/                    # Minikube manifests (+ prometheus, grafana)
 ├── loadtest/
 │   └── smoke.py                # SELL then BUY demo
+│   └── spamAPI.py              # Load test order-api using locust 
 ├── Dockerfile                  # Multi-stage; SERVICE build-arg
 └── README.md
 ```
@@ -91,7 +82,7 @@ DistributedLedger/
 
 - Docker Desktop (or Docker Engine + Compose v2)
 - Go 1.22+ (only if running binaries outside Compose)
-- Python 3 (for `loadtest/smoke.py`)
+- Python 3 + locust (``` pip install locust```) (for `loadtest/smoke.py` and `loadtest/spamApi.py`)
 - Optional for Kubernetes path: `kubectl`, `minikube`
 
 ---
@@ -104,7 +95,13 @@ From this directory (`DistributedLedger/`):
 docker compose -f deploy/docker-compose.yml up --build
 ```
 
-Compose paths are relative to `deploy/`. Build context is the repo root (`context: ..`) so `go.mod` / `cmd/` are visible to the Dockerfile.
+Open Prometheus ```http://localhost:9090``` → Status → Targets — all three should be UP
+
+Open Grafana ```http://localhost:3000```
+
+Import Dashboard from ```deploy/grafana/ledger-dashboard.json```
+Grafana: login `admin` / `admin`.
+
 
 On first empty Postgres volume, `migrations/001_init.sql` creates tables and seeds two demo users:
 
@@ -131,6 +128,15 @@ curl -s -X POST http://localhost:8080/api/v1/orders \
   -H 'Content-Type: application/json' \
   -d '{"user_id":"11111111-1111-1111-1111-111111111111","ticker":"APPL","side":"BUY","qty":"10","price":"150.00"}'
 ```
+
+
+### Load test
+```
+cd loadtest
+locust -f loadtest/spamAPI.py --host http://localhost:8080
+```
+Open ```http://localhost:8089``` — start small (10 users)
+
 
 ### Inspect ledger
 
@@ -171,16 +177,18 @@ kubectl apply -f deploy/k8s/
 
 # Schema + seed (K8s Postgres has no Compose init mount)
 kubectl -n ledger exec -i deploy/postgres -- psql -U ledger -d ledger < migrations/001_init.sql
-
-kubectl -n ledger port-forward svc/order-api 8080:8080
-# then run smoke.py or curl as above
 ```
 
-Notes:
+### Port-forward (API + observability)
 
-- Only **order-api** exposes a Service (HTTP). Matcher and settlement are background workers.
-- Keep **matching-engine** at `replicas: 1` for this design (shared Redis book, no ticker sharding yet).
-- Images must be built into Minikube’s Docker (`eval $(minikube docker-env)`); Deployments use `imagePullPolicy: IfNotPresent`.
+```bash
+kubectl -n ledger port-forward svc/order-api 8080:8080      # smoke / curl / Locust
+kubectl -n ledger port-forward svc/prometheus 9090:9090    # http://localhost:9090
+kubectl -n ledger port-forward svc/grafana 3000:3000        # http://localhost:3000
+```
+
+Add Prometheus datasource URL `http://prometheus:9090` (Service DNS inside the cluster).
+
 
 Inspect DB:
 
@@ -189,8 +197,7 @@ kubectl -n ledger exec -it deploy/postgres -- psql -U ledger -d ledger
 ```
 
 
-
-## Cleanup (save CPU / RAM)
+## Cleanup 
 
 ```bash
 # Compose

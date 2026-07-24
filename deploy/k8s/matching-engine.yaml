@@ -17,8 +17,25 @@ spec:
         - name: matching-engine
           image: ledger-matching-engine:dev
           imagePullPolicy: IfNotPresent
+          ports:
+            # Metrics only (Prometheus scrapes via Service below).
+            - containerPort: 2112
           env:
             - name: DATABASE_URL
               value: postgres://ledger:ledger@postgres:5432/ledger?sslmode=disable
             - name: REDIS_ADDR
               value: redis:6379
+---
+# ClusterIP so Prometheus can resolve matching-engine:2112 (same idea as Compose DNS).
+apiVersion: v1
+kind: Service
+metadata:
+  name: matching-engine
+  namespace: ledger
+spec:
+  selector:
+    app: matching-engine
+  ports:
+    - name: metrics
+      port: 2112
+      targetPort: 2112
