@@ -54,7 +54,12 @@ func main() {
 	log.Printf("settlement-worker as %s", consumer)
 
 	for {
-		staleMsgs , _ := rdb.ClaimStale(ctx, redisx.StreamSettlement, redisx.GroupSettlers, consumer, 60 * time.Second)
+		staleMsgs, err := rdb.ClaimStale(ctx, redisx.StreamSettlement, redisx.GroupSettlers, consumer, 60 * time.Second)
+		if err != nil {
+			log.Printf("ClaimStale error: %v", err)
+			time.Sleep(time.Second)
+			continue
+		}
 
 		for _, streamMsg := range staleMsgs {
 			handleSettlementMsg(ctx, settlementWorker, rdb, streamMsg.ID, streamMsg.Values)

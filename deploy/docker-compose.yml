@@ -92,6 +92,9 @@ services:
     image: grafana/grafana:11.1.0
     ports:
       - "3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/ledger-dashboard.json:/var/lib/grafana/dashboards/ledger-dashboard.json:ro
     depends_on:
       - prometheus
 

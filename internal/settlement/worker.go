@@ -79,8 +79,14 @@ func (worker * Worker) Settle(ctx context.Context, event matching.MatchEvent) er
 // map Redis values to MatchEvent
 func ParseEvent(messageFields map[string]interface{}) (matching.MatchEvent, error) {
 	readField := func(fieldName string) string {
-		fieldValue , _ := messageFields[fieldName].(string)
-		return fieldValue
+		switch val := messageFields[fieldName].(type) {
+		case string:
+			return val
+		case []byte:
+			return string(val)
+		default:
+			return ""
+		}
 	}
 
 	matchEvent := matching.MatchEvent{

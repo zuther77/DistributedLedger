@@ -71,6 +71,7 @@ func (h *Handlers) GetOrder(c *gin.Context) {
 	order , err := h.Repo.GetOrderByID(c.Request.Context(), id)
 	if errors.Is(err , ErrNotFound) {
 		c.JSON(http.StatusNotFound, gin.H{"error" : "order not found"})
+		return
 	}
 
 	if err != nil {
@@ -89,8 +90,6 @@ func (h *Handlers) GetOrder(c *gin.Context) {
 		"created_at": order.CreatedAt,
 	})
 }
-
-
 
 // valide a order 
 func validateOrderRequest(req CreateOrderRequest) error {

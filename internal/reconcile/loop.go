@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/zuther77/distributed-ledger/internal/matching"
 	"github.com/zuther77/distributed-ledger/internal/orders"
 	"github.com/zuther77/distributed-ledger/internal/redisx"
 )
@@ -35,7 +36,18 @@ func runOnce(ctx context.Context, orderRepo *orders.Repository, rediClient *redi
 		return err
 	}
 
+	book := &matching.Book{RDB: rediClient}
 	for _, order := range staleOrders {
+		onBook, err := book.IsOnBook(ctx, order.Ticker, string(order.Side), order.ID)
+		if err != nil {
+			log.Printf("reconcile book check %s: %v", order.ID, err)
+			continue
+		}
+		if onBook {
+			log.Printf("reconcile: skip %s (already on book)", order.ID)
+			continue
+		}
+
 		if err := rediClient.EnqueueOrder(ctx, order.ID); err != nil {
 			log.Printf("reconcile enqueue %s: %v", order.ID, err)
 			continue

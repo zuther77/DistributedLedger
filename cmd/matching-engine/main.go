@@ -76,6 +76,8 @@ func main() {
 		stale, err := rdb.ClaimStale(ctx, redisx.StreamOrders, redisx.GroupMatchers, consumer, 60 * time.Second)
 		if err != nil {
 			log.Printf("error from ClaimStale: %v", err)
+			time.Sleep(time.Second)
+			continue
 		}
 
 		for _ , msg := range stale {
@@ -96,8 +98,19 @@ func main() {
 	}
 }
 
+func streamFieldString(v interface{}) string {
+	switch val := v.(type) {
+	case string:
+		return val
+	case []byte:
+		return string(val)
+	default:
+		return ""
+	}
+}
+
 func processOrderMsg(ctx context.Context, engine *matching.Engine, rdb *redisx.Client, id string, values map[string]interface{}) {
-	orderID , _ := values["order_id"].(string)
+	orderID := streamFieldString(values["order_id"])
 	if orderID == "" {
 		log.Printf("message %s mission order_id - acknowledging", id)
 		_ = rdb.Ack(ctx, redisx.StreamOrders, redisx.GroupMatchers, id)

@@ -71,7 +71,7 @@ DistributedLedger/
 │   └── k8s/                    # Minikube manifests (+ prometheus, grafana)
 ├── loadtest/
 │   └── smoke.py                # SELL then BUY demo
-│   └── spamAPI.py              # Load test order-api using locust 
+│   └── locustfile.py           # Load test order-api using locust
 ├── Dockerfile                  # Multi-stage; SERVICE build-arg
 └── README.md
 ```
@@ -82,7 +82,7 @@ DistributedLedger/
 
 - Docker Desktop (or Docker Engine + Compose v2)
 - Go 1.22+ (only if running binaries outside Compose)
-- Python 3 + locust (``` pip install locust```) (for `loadtest/smoke.py` and `loadtest/spamApi.py`)
+- Python 3 + locust (``` pip install locust```) (for `loadtest/smoke.py` and `loadtest/locustfile.py`)
 - Optional for Kubernetes path: `kubectl`, `minikube`
 
 ---
@@ -97,10 +97,7 @@ docker compose -f deploy/docker-compose.yml up --build
 
 Open Prometheus ```http://localhost:9090``` → Status → Targets — all three should be UP
 
-Open Grafana ```http://localhost:3000```
-
-Import Dashboard from ```deploy/grafana/ledger-dashboard.json```
-Grafana: login `admin` / `admin`.
+Open Grafana ```http://localhost:3000``` — login `admin` / `admin`. Prometheus datasource and the **Distributed Ledger** dashboard are auto-provisioned on startup (no manual import).
 
 
 On first empty Postgres volume, `migrations/001_init.sql` creates tables and seeds two demo users:
@@ -131,9 +128,8 @@ curl -s -X POST http://localhost:8080/api/v1/orders \
 
 
 ### Load test
-```
-cd loadtest
-locust -f loadtest/spamAPI.py --host http://localhost:8080
+```bash
+locust -f loadtest/locustfile.py --host http://localhost:8080
 ```
 Open ```http://localhost:8089``` — start small (10 users)
 
@@ -165,6 +161,21 @@ docker compose -f deploy/docker-compose.yml up --build
 
 ## Kubernetes (Minikube)
 
+### Terraform (optional)
+
+From `deploy/terraform/` (requires `kubectl` context `minikube`):
+
+```bash
+cd deploy/terraform
+terraform init
+terraform plan
+terraform apply
+```
+
+Creates the `ledger` namespace and runs `kubectl apply -f ../k8s/`. Bump `force_version` in `main.tf` after YAML edits if apply does not re-run manifests.
+
+### Manual apply
+
 ```bash
 minikube start
 eval $(minikube docker-env)
@@ -175,6 +186,9 @@ docker build -t ledger-settlement-worker:dev --build-arg SERVICE=settlement-work
 
 kubectl apply -f deploy/k8s/
 
+# Optional HPA (requires metrics-server: minikube addons enable metrics-server)
+kubectl apply -f deploy/k8s/order-api-hpa.yaml
+
 # Schema + seed (K8s Postgres has no Compose init mount)
 kubectl -n ledger exec -i deploy/postgres -- psql -U ledger -d ledger < migrations/001_init.sql
 ```
@@ -184,11 +198,8 @@ kubectl -n ledger exec -i deploy/postgres -- psql -U ledger -d ledger < migratio
 ```bash
 kubectl -n ledger port-forward svc/order-api 8080:8080      # smoke / curl / Locust
 kubectl -n ledger port-forward svc/prometheus 9090:9090    # http://localhost:9090
-kubectl -n ledger port-forward svc/grafana 3000:3000        # http://localhost:3000
+kubectl -n ledger port-forward svc/grafana 3000:3000        # http://localhost:3000 (auto-provisioned Prometheus + dashboard)
 ```
-
-Add Prometheus datasource URL `http://prometheus:9090` (Service DNS inside the cluster).
-
 
 Inspect DB:
 

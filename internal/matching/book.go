@@ -9,6 +9,12 @@ import (
 	"github.com/zuther77/distributed-ledger/internal/redisx"
 )
 
+// BookLevel is one resting order on a side of the book.
+type BookLevel struct {
+	OrderID string `json:"order_id"`
+	Price   string `json:"price"`
+}
+
 // nested client, use Book.RDB.RDB
 type Book struct {
 	RDB *redisx.Client
@@ -101,6 +107,67 @@ func (b *Book) BestBid(ctx context.Context, ticker string) (orderID, price strin
 	return orderID, formatPrice(vals[0].Score), true, nil
 }
 
+
+// IsOnBook reports whether orderID is resting on the book for ticker's side ("BUY" or "SELL").
+func (b *Book) IsOnBook(ctx context.Context, ticker, side, orderID string) (bool, error) {
+	key := redisx.AsksKey(ticker)
+	if side == "BUY" {
+		key = redisx.BidsKey(ticker)
+	}
+	_, err := b.RDB.RDB.ZScore(ctx, key, orderID).Result()
+	if err == redis.Nil {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// ListBids returns up to limit highest bids (best first).
+func (b *Book) ListBids(ctx context.Context, ticker string, limit int64) ([]BookLevel, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	vals, err := b.RDB.RDB.ZRangeArgsWithScores(ctx, redis.ZRangeArgs{
+		Key:   redisx.BidsKey(ticker),
+		Start: 0,
+		Stop:  limit - 1,
+		Rev:   true,
+	}).Result()
+	if err != nil {
+		return nil, err
+	}
+	return zToLevels(vals), nil
+}
+
+// ListAsks returns up to limit lowest asks (best first).
+func (b *Book) ListAsks(ctx context.Context, ticker string, limit int64) ([]BookLevel, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	vals, err := b.RDB.RDB.ZRangeArgsWithScores(ctx, redis.ZRangeArgs{
+		Key:   redisx.AsksKey(ticker),
+		Start: 0,
+		Stop:  limit - 1,
+	}).Result()
+	if err != nil {
+		return nil, err
+	}
+	return zToLevels(vals), nil
+}
+
+func zToLevels(vals []redis.Z) []BookLevel {
+	levels := make([]BookLevel, 0, len(vals))
+	for _, z := range vals {
+		orderID, _ := z.Member.(string)
+		levels = append(levels, BookLevel{
+			OrderID: orderID,
+			Price:   formatPrice(z.Score),
+		})
+	}
+	return levels
+}
 
 // helper functions
 func formatPrice(score float64) string {

@@ -9,6 +9,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/zuther77/distributed-ledger/internal/config"
 	"github.com/zuther77/distributed-ledger/internal/db"
+	"github.com/zuther77/distributed-ledger/internal/orderbook"
 	"github.com/zuther77/distributed-ledger/internal/orders"
 	"github.com/zuther77/distributed-ledger/internal/redisx"
 )
@@ -40,17 +41,19 @@ func main() {
         Repo: &orders.Repository{DB: pool},
         Redis: rdb,
     }
+    bookHandler := &orderbook.Handler{Redis: rdb}
     ginEngine := gin.Default()
 
     // group created so apis stay under /api/v1
     v1 := ginEngine.Group("/api/v1")
     v1.POST("/orders", handlers.CreateOrder)
     v1.GET("/orders/:id", handlers.GetOrder)
+    v1.GET("/orderbook/:ticker", bookHandler.Get)
 
     // metrics endpoint. scrappers expect this path at the server root
     ginEngine.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
-    log.Printf("order-api listening on %2=s", config.HTTPAddr)
+    log.Printf("order-api listening on %s", config.HTTPAddr)
     if err := ginEngine.Run(config.HTTPAddr); err != nil {
         log.Fatalf("http server: %v", err )
     }
